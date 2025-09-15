@@ -1,0 +1,2 @@
+- optimize get_peerDependencies() to use a binary or velocity search
+- refactor recursive logic so that second run of downgrade_dependency() is not needed
