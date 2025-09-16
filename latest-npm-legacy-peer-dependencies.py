@@ -1,3 +1,4 @@
+import bisect
 from datetime import datetime, timezone, timedelta
 import re
 import json
@@ -124,7 +125,7 @@ def check_version_compatibility(version, compatible_versions):
     return False, greater_than
 
 # ------------------------------
-# Recursive Helpers
+# Test Recursive Add
 # ------------------------------
 
 def add_dependency_to_package(package, dependency, include_stale_dependencies):
@@ -146,10 +147,20 @@ def downgrade_peer(peer_version, peer_versions, compatible_versions, peer, depen
     compatible, greater_than = check_version_compatibility(peer_version, compatible_versions)
     if compatible: return peer_version
     if greater_than:
-        for version in peer_versions:
-            if version >= peer_version: continue
-            if check_version_compatibility(version, compatible_versions)[0]: return version
-    raise Exception(f"Conflict detected: {peer}@{peer_version} no lower version satisifies the requirement of {compatible_versions} from {dependency}@{dependency_version}")
+        idx = bisect.bisect_left(peer_versions, peer_version) - 1
+        lo, hi = 0, idx
+        best = None
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            candidate = peer_versions[mid]
+            is_compatible, _ = check_version_compatibility(candidate, compatible_versions)
+            if is_compatible:
+                best = candidate
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        if best is not None: return best
+    raise Exception(f"Conflict detected: {peer}@{peer_version} has no lower version satisfying {compatible_versions} from {dependency}@{dependency_version}")
 
 
 def downgrade_dependency(package, dependency, include_stale_dependencies):
@@ -187,6 +198,21 @@ def downgrade_dependency(package, dependency, include_stale_dependencies):
             package = downgrade_dependency(package, peer, include_stale_dependencies=include_stale_dependencies)
     return package
 
+
+def verify_all_versions(packages):
+    problems = []
+    for pkg, info in packages.items():
+        version = info["version"]
+        peers = info.get("peerDependencies", {})
+        for peer_name, peer_constraint in peers.items():
+            if peer_name not in packages:
+                problems.append(f"{pkg}@{version} requires {peer_name}@{peer_constraint}, but {peer_name} is not installed")
+                continue
+            peer_version = packages[peer_name]["version"]
+            compatible, _ = check_version_compatibility(peer_version, peer_constraint)
+            if not compatible: problems.append(f"{pkg}@{version} requires {peer_name}@{peer_constraint}, but found {peer_name}@{peer_version}")
+    return (True, None) if not problems else (False, problems)
+
 # ------------------------------
 # Main
 # ------------------------------
@@ -209,6 +235,8 @@ def main():
         json.dump(package_export, f, indent=4)
 
     print(f"\nstale packages found: {[dependency for dependency in package if package[dependency]["stale"]]}")
+
+    print(verify_all_versions(package))
 
 if __name__ == "__main__":
     main()
