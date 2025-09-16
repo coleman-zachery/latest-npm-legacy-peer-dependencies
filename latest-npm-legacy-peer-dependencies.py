@@ -1,4 +1,3 @@
-import bisect
 from datetime import datetime, timezone, timedelta
 import re
 import json
@@ -147,20 +146,10 @@ def downgrade_peer(peer_version, peer_versions, compatible_versions, peer, depen
     compatible, greater_than = check_version_compatibility(peer_version, compatible_versions)
     if compatible: return peer_version
     if greater_than:
-        idx = bisect.bisect_left(peer_versions, peer_version) - 1
-        lo, hi = 0, idx
-        best = None
-        while lo <= hi:
-            mid = (lo + hi) // 2
-            candidate = peer_versions[mid]
-            is_compatible, _ = check_version_compatibility(candidate, compatible_versions)
-            if is_compatible:
-                best = candidate
-                lo = mid + 1
-            else:
-                hi = mid - 1
-        if best is not None: return best
-    raise Exception(f"Conflict detected: {peer}@{peer_version} has no lower version satisfying {compatible_versions} from {dependency}@{dependency_version}")
+        for version in peer_versions:
+            if version >= peer_version: continue
+            if check_version_compatibility(version, compatible_versions)[0]: return version
+    raise Exception(f"Conflict detected: {peer}@{peer_version} no lower version satisifies the requirement of {compatible_versions} from {dependency}@{dependency_version}")
 
 
 def downgrade_dependency(package, dependency, include_stale_dependencies):
@@ -199,32 +188,107 @@ def downgrade_dependency(package, dependency, include_stale_dependencies):
     return package
 
 
-def verify_all_versions(packages):
+def verify_all_versions(package):
     problems = []
-    for pkg, info in packages.items():
+    for pkg, info in package.items():
         version = info["version"]
         peers = info.get("peerDependencies", {})
         for peer_name, peer_constraint in peers.items():
-            if peer_name not in packages:
+            if peer_name not in package:
                 problems.append(f"{pkg}@{version} requires {peer_name}@{peer_constraint}, but {peer_name} is not installed")
                 continue
-            peer_version = packages[peer_name]["version"]
+            peer_version = package[peer_name]["version"]
             compatible, _ = check_version_compatibility(peer_version, peer_constraint)
             if not compatible: problems.append(f"{pkg}@{version} requires {peer_name}@{peer_constraint}, but found {peer_name}@{peer_version}")
     return (True, None) if not problems else (False, problems)
 
 # ------------------------------
-# Main
+# While Logic
 # ------------------------------
 
-def main():
-    include_stale_dependencies = ["react-table", "@testing-library/react-hooks"]
+def recursive_add_to_package(package, dependency, include_stale_dependencies):
+    if dependency not in package:
+        print(f" Fetching versions for {dependency}...")
+        versions = get_sorted_versions(dependency)
+        version = versions[0]
+        peerDependencies = get_peerDependencies(dependency, version)
+        package[dependency] = {
+            "versions": versions,
+            "version": version,
+            "peerDependencies": peerDependencies,
+            "stale": False if dependency in include_stale_dependencies or len(peerDependencies) == 0 else dependency_is_stale(dependency),
+        }
+        for peer in peerDependencies:
+            if peer in package: continue
+            package = recursive_add_to_package(package, peer, include_stale_dependencies=include_stale_dependencies)
+    return package
 
+
+def check_package_compatability(package, stop=True):
+    problems = []
+    for dependency, info in package.items():
+        version = info["version"]
+        peers = info.get("peerDependencies", {})
+        for peer_name, peer_constraint in peers.items():
+            if peer_name not in package:
+                if stop:
+                    problem = f"{dependency}@{version} requires {peer_name}@{peer_constraint}, but {peer_name} is not installed"
+                    return problem
+                problems.append(problem)
+                continue
+            peer_version = package[peer_name]["version"]
+            compatible, greater_than = check_version_compatibility(peer_version, peer_constraint)
+            if not compatible:
+                if stop:
+                    problem = dependency, peer_name, peer_version, peer_constraint, greater_than
+                    return problem
+                problem = f"{dependency}@{version} requires {peer_name}@{peer_constraint}, but found {peer_name}@{peer_version}"
+                problems.append(problem)
+    return None if stop else (True, None) if not problems else (False, problems)
+
+
+def get_all_latest_dependencies(include_stale_dependencies):
     package = {}
     for dependency in get_dependencies_list():
-        package = downgrade_dependency(package, dependency, include_stale_dependencies=include_stale_dependencies)
-    for dependency in package:
-        package = downgrade_dependency(package, dependency, include_stale_dependencies=include_stale_dependencies)
+        package = recursive_add_to_package(package, dependency, include_stale_dependencies=include_stale_dependencies)
+    return package
+
+
+def update_version(package, dependency, version, peerDependencies=None):
+    package[dependency]["version"] = version
+    package[dependency]["peerDependencies"] = peerDependencies or get_peerDependencies(dependency, version)
+    return package
+
+
+def resolve_conflict(package, dependency, peer_name, peer_version, peer_constraint, greater_than):
+    dependency_version = package[dependency]["version"]
+    # downgrade peer
+    if greater_than:
+        peer_versions = package[peer_name]["versions"]
+        for version in peer_versions:
+            if version >= peer_version: continue
+            if check_version_compatibility(version, peer_constraint)[0]:
+                print(f"-- downgraded peer: '{peer_name}' version {peer_version} to {version}")
+                return update_version(package, peer_name, version)
+        dependency_version = package[dependency]["version"]
+        raise Exception(f"Conflict detected: {peer_name}@{peer_version} no lower version satisifies the requirement of {peer_constraint} from {dependency}@{dependency_version}")
+    # downgrade dependency
+    dependency_versions = package[dependency]["versions"]
+    for version in dependency_versions:
+        if version >= dependency_version: continue
+        temp_peerDependencies = get_peerDependencies(dependency, version)
+        peer_constraint = temp_peerDependencies[peer_name]
+        if check_version_compatibility(peer_version, peer_constraint)[0]:
+            print(f"-- downgraded dependency: '{dependency}' version {dependency_version} to {version}")
+            return update_version(package, dependency, version, peerDependencies=temp_peerDependencies)
+
+
+def main2():
+    include_stale_dependencies = ["react-table", "@testing-library/react-hooks"]
+    package = get_all_latest_dependencies(include_stale_dependencies=include_stale_dependencies)
+    while problem := check_package_compatability(package):
+        dependency, peer_name, peer_version, peer_constraint, greater_than = problem
+        package = resolve_conflict(package, dependency, peer_name, peer_version, peer_constraint, greater_than)
 
     with open("package-versions.json", "w") as f:
         package_without_versions_keys = {k: {key: val for key, val in v.items() if key != "versions"} for k, v in package.items()}
@@ -236,7 +300,34 @@ def main():
 
     print(f"\nstale packages found: {[dependency for dependency in package if package[dependency]["stale"]]}")
 
-    print(verify_all_versions(package))
+
+# ------------------------------
+# Main
+# ------------------------------
+
+def main():
+    include_stale_dependencies = ["react-table", "@testing-library/react-hooks"]
+
+    package = {}
+    for dependency in get_dependencies_list():
+        package = downgrade_dependency(package, dependency, include_stale_dependencies=include_stale_dependencies)
+
+    passing, errors = verify_all_versions(package)
+    while not passing:
+        print(errors)
+        for dependency in package:
+            package = downgrade_dependency(package, dependency, include_stale_dependencies=include_stale_dependencies)
+        passing, errors = verify_all_versions(package)
+
+    with open("package-versions.json", "w") as f:
+        package_without_versions_keys = {k: {key: val for key, val in v.items() if key != "versions"} for k, v in package.items()}
+        json.dump(package_without_versions_keys, f, indent=4)
+
+    with open("package-export.json", "w") as f:
+        package_export = {dependency: package[dependency]["version"] for dependency in get_dependencies_list()}
+        json.dump(package_export, f, indent=4)
+
+    print(f"\nstale packages found: {[dependency for dependency in package if package[dependency]["stale"]]}")
 
 if __name__ == "__main__":
-    main()
+    main2()
