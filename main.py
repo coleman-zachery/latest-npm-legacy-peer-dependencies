@@ -114,24 +114,24 @@ def overwrite_package():
 # npm info shell
 # ------------------------------
 
-def json_npm_shell(dependency, action, default="{}"):
-    output = subprocess.run(f"npm info {dependency} {action} --json", shell=True, capture_output=True, text=True).stdout.strip()
+def json_npm_shell(command, dependency, field, default="{}"):
+    output = subprocess.run(f"npm {command} {dependency} {field} --json", shell=True, capture_output=True, text=True).stdout.strip()
     return json.loads(output or default)
 
 
 
 
 
-def npm_cache(dependency, action, default="{}"):
+def npm_cache(command, dependency, field, default="{}"):
     NPM_CACHE_FILE = ".npm_cache.json"
-    command = f"{dependency} {action}"
+    full_command = f"{command} {dependency} {field}"
     cache, data = {}, None
     if os.path.exists(NPM_CACHE_FILE):
         with open(NPM_CACHE_FILE, "r") as file:
             cache = json.load(file)
-        if command in cache: return cache[command]
-    data = json_npm_shell(dependency, action, default=default)
-    cache[command] = data
+        if full_command in cache: return cache[full_command]
+    data = json_npm_shell(command, dependency, field, default=default)
+    cache[full_command] = data
     with open(NPM_CACHE_FILE, "w") as file:
         json.dump(cache, file, indent=4)
     return data
@@ -141,8 +141,8 @@ def npm_cache(dependency, action, default="{}"):
 
 
 def get_versions(dependency):
-    print(f"[{dependency}]: versions", end=" ", flush=True)
-    versions_output = npm_cache(dependency, "versions", "[]")
+    print(f"{dependency}: versions", end=" ", flush=True)
+    versions_output = npm_cache("info", dependency, "versions", "[]")
     pattern = r"\d+\.\d+\.\d+(?:-0)?"
     filtered_versions = list(set([version for version in versions_output if re.fullmatch(pattern, version)]))
     versions = sorted(filtered_versions, key=parse, reverse=True)
@@ -153,10 +153,20 @@ def get_versions(dependency):
 
 
 
+def get_latest_version(dependency):
+    dist_tags_output = npm_cache("view", dependency, "dist-tags")
+    latest_version = dist_tags_output["latest"]
+    print(f"latest version ({latest_version})", end=" ", flush=True)
+    return latest_version
+
+
+
+
+
 def get_peerDependencies(dependency, version, mute=False):
-    if mute == False: print(f"(latest version: {version}) peerDependencies", end=" ", flush=True)
-    peerDependencies_output = npm_cache(f"{dependency}@{version}", "peerDependencies")
-    peerDependenciesMeta_output = npm_cache(f"{dependency}@{version}", "peerDependenciesMeta")
+    if mute == False: print(f"peerDependencies", end=" ", flush=True)
+    peerDependencies_output = npm_cache("info", f"{dependency}@{version}", "peerDependencies")
+    peerDependenciesMeta_output = npm_cache("info", f"{dependency}@{version}", "peerDependenciesMeta")
     peerDependencies = {}
     for peer, semver_requirements in peerDependencies_output.items():
         if peerDependenciesMeta_output.get(peer, {}).get("optional", False): continue
@@ -169,7 +179,7 @@ def get_peerDependencies(dependency, version, mute=False):
 
 
 def is_dependency_stale(dependency, years=1):
-    time_output = npm_cache(dependency, "time")
+    time_output = npm_cache("info", dependency, "time")
     filtered_time = [(version, timestamp) for version, timestamp in time_output.items() if version != "modified"]
     latest_timestamp = max(timestamp for _, timestamp in filtered_time).replace("Z", "+00:00")
     then = datetime.fromisoformat(latest_timestamp)
@@ -306,12 +316,12 @@ def add_recursive_dependency_to_package(package, dependency, required_by="<root>
         if required_by not in package[dependency]["required_by"]: package[dependency]["required_by"].append(required_by)
     else:
         versions = get_versions(dependency)
-        version = versions[0]
-        peerDependencies = get_peerDependencies(dependency, version)
+        latest_version = get_latest_version(dependency)
+        peerDependencies = get_peerDependencies(dependency, latest_version)
         stale = False if dependency in include_stale_dependencies or len(peerDependencies) == 0 else is_dependency_stale(dependency)
         package[dependency] = {
             "versions": versions,
-            "version": version,
+            "version": latest_version,
             "peerDependencies": peerDependencies,
             "required_by": [required_by],
             "stale": stale,
