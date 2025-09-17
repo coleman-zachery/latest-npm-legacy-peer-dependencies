@@ -2,7 +2,7 @@
 Update your package.json to use the latest non-breaking dependencies and their required peers.
 
 - finds all your package dependencies
-- fetches all dependency build versions and defaults to latest versions
+- fetches all dependency stable versions and defaults to latest stable version for each dependency
 - finds missing required peerDependencies and adds them to package
 - detects stale dependencies
 - recursively downgrades dependencies to satisfy peerDependencies
