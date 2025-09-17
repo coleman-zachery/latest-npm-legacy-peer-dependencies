@@ -1,12 +1,13 @@
 # npm-latest-peerDependencies
+Headaches using `npm install --legacy-peer-deps`?  
 Update your package.json to use the latest non-breaking dependencies and their required peers.
 
-- finds all your package dependencies
-- fetches all dependency stable versions and defaults to latest stable version for each dependency
-- finds missing required peerDependencies and adds them to package
-- detects stale dependencies
-- recursively downgrades dependencies to satisfy peerDependencies
-- can update your package.json in place
+- Finds all your package dependencies.
+- Fetches all dependency stable versions and defaults to latest stable version for each dependency.
+- Finds missing required peerDependencies and adds them to package.
+- Detects stale dependencies.
+- Recursively downgrades dependencies to satisfy peerDependencies.
+- Can update your package.json in place.
 
 <img width="961" height="292" alt="image" src="https://github.com/user-attachments/assets/0f71ac72-020f-473e-8037-71e2e896231f" />
 
