@@ -27,12 +27,20 @@ def get_dependencies_list():
                 dependencies_list.extend(list(value))
         return dependencies_list
 
+
+
+
+
 def write_package_versions(package):
     with open("package-versions.json", "w") as file:
         package_versions = {}
         for dependency, dependency_info in package.items():
             package_versions[dependency] = dependency_info["version"]
         json.dump(package_versions, file, indent=4)
+
+
+
+
 
 def write_package_peerDependencies(package):
     with open("package-peerDependencies.json", "w") as file:
@@ -44,23 +52,35 @@ def write_package_peerDependencies(package):
                     package_peerDependencies[dependency][key] = value
         json.dump(package_peerDependencies, file, indent=4)
 
+
+
+
+
 def print_added_peerDependencies(package):
     added_peerDependencies = []
     dependencies = get_dependencies_list()
     for dependency in package:
         if dependency in dependencies: continue
         added_peerDependencies.append(dependency)
-    print(f"added peerDependencies: {added_peerDependencies}")
+    print(f"\nadded peerDependencies: {added_peerDependencies}")
+
+
+
+
 
 def print_stale_dependencies(package):
     stale_dependencies = []
     for dependency, dependency_info in package.items():
         if dependency_info["stale"]:
             stale_dependencies.append(dependency)
-    print(f"stale dependencies found: {stale_dependencies}")
+    print(f"\nstale dependencies found: {stale_dependencies}")
+
+
+
+
 
 def overwrite_package():
-    overwrite = input('Enter "yes" to overwrite package.json: ')
+    overwrite = input('\nEnter "yes" to overwrite package.json: ')
     overwrite = overwrite.strip().lower() == "yes"
     if overwrite:
         with open("package-versions.json", "r") as file:
@@ -98,6 +118,10 @@ def json_npm_shell(dependency, action, default="{}"):
     output = subprocess.run(f"npm info {dependency} {action} --json", shell=True, capture_output=True, text=True).stdout.strip()
     return json.loads(output or default)
 
+
+
+
+
 def npm_cache(dependency, action, default="{}"):
     NPM_CACHE_FILE = ".npm_cache.json"
     command = f"{dependency} {action}"
@@ -112,6 +136,10 @@ def npm_cache(dependency, action, default="{}"):
         json.dump(cache, file, indent=4)
     return data
 
+
+
+
+
 def get_versions(dependency):
     print(f"[{dependency}]: versions", end=" ", flush=True)
     versions_output = npm_cache(dependency, "versions", "[]")
@@ -121,8 +149,12 @@ def get_versions(dependency):
     print(f"({len(versions)})", end=" ", flush=True)
     return versions
 
+
+
+
+
 def get_peerDependencies(dependency, version, mute=False):
-    if mute == False: print(f"[{dependency}@{version}]: peerDependencies", end=" ", flush=True)
+    if mute == False: print(f"(latest version: {version}) peerDependencies", end=" ", flush=True)
     peerDependencies_output = npm_cache(f"{dependency}@{version}", "peerDependencies")
     peerDependenciesMeta_output = npm_cache(f"{dependency}@{version}", "peerDependenciesMeta")
     peerDependencies = {}
@@ -131,6 +163,10 @@ def get_peerDependencies(dependency, version, mute=False):
         peerDependencies[peer] = semver_requirements
     if mute == False: print(f"({len(peerDependencies)})", flush=True)
     return peerDependencies
+
+
+
+
 
 def is_dependency_stale(dependency, years=1):
     time_output = npm_cache(dependency, "time")
@@ -161,6 +197,10 @@ def range_intersection(range1, range2):
     max_ = max2 if max1 == "inf" else max1 if max2 == "inf" else min(max1, max2)
     if max_ != "inf" and min_ >= max_: return None
     return min_, max_
+
+
+
+
 
 def check_version_compatibility(semver_version, semver_requirements):
 
@@ -224,7 +264,6 @@ def check_version_compatibility(semver_version, semver_requirements):
 
 
 
-
 # ------------------------------
 # un-used
 # ------------------------------
@@ -237,6 +276,10 @@ def range_union(range1, range2):
     new_max = max(max1, max2) if max1 != "inf" and max2 != "inf" else "inf"
     return new_min, new_max
 
+
+
+
+
 def semver_range_to_string(range_):
     def parts_to_string(parts): return ".".join(str(p) if p is not None else "x" for p in parts)
     min_parts, max_parts = range_
@@ -244,7 +287,6 @@ def semver_range_to_string(range_):
     if max_parts == "inf": return min_str
     max_str = f"<{parts_to_string(max_parts)}"
     return f"{min_str} {max_str}"
-
 
 
 
@@ -279,10 +321,13 @@ def add_recursive_dependency_to_package(package, dependency, required_by="<root>
     return package
 
 
+
+
+
 def check_package_problems(package):
     problems = {
-        "greater_than": [],
-        "else": [],
+        "greater_than": {},
+        "else": {},
     }
     stop = False
     for dependency, dependency_info in package.items():
@@ -296,9 +341,12 @@ def check_package_problems(package):
             compatible, greater_than = check_version_compatibility(dependency_version, dependency_requirements)
             if compatible: continue
             stop = True
-            problems["greater_than" if greater_than else "else"].append([peer, dependency_requirements])
+            problems["greater_than" if greater_than else "else"][peer] = dependency_requirements
         if stop: return dependency, dependency_version, problems
     return None
+
+
+
 
 
 def resolve_package_problems(package, package_problems, include_stale_dependencies=[]):
@@ -324,13 +372,21 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
 
     # downgrade dependency to meet dependency_requirements
     if len(problems["greater_than"]) > 0:
-        combined_dependency_requirements = " || ".join([dependency_requirement for (_, dependency_requirement) in problems["greater_than"]])
-        for version in package[dependency]["versions"]:
-            if version >= dependency_version: continue
-            if check_version_compatibility(version, combined_dependency_requirements)[1]: continue
-            print(f"[{dependency}]: downgraded dependency version {dependency_version} to {version}")
+        satisfied_peers = None
+        for peer, dependency_requirements in problems["greater_than"].items():
+            peers = []
+            for version in package[dependency]["versions"]:
+                if version > dependency_version: continue
+                if check_version_compatibility(version, dependency_requirements)[1]:
+                    if peer not in peers: peers.append(peer)
+                    continue
+                break
             package = _update_dependency_version(package, dependency, version, peerDependencies=None, include_stale_dependencies=include_stale_dependencies)
-            break
+            if len(peers) > 0:
+                satisfied_peers = peers
+        print(f"\n[{dependency}]: downgraded dependency version {dependency_version} --> {version}")
+        for peer in satisfied_peers:
+            print(f"-- satisfied {peer}@{package[peer]["version"]} peerDependency: {dependency}@{problems["greater_than"][peer]}")
 
     def _find_compatible_version(peer, dependency, dependency_version, package):
         versions = package[peer]["versions"]
@@ -355,14 +411,15 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
 
     # downgrade peer to meet current dependency version
     dependency_version = package[dependency]["version"]
-    for peer, _ in problems["else"]:
-        print(f"[{peer}]: downgrading...")
+    for peer, _ in problems["else"].items():
         peer_version = package[peer]["version"]
+        peer_requirements = package[peer]["peerDependencies"][dependency]
         version = _find_compatible_version(peer, dependency, dependency_version, package)
         if version:
-            print(f"[{peer}]: downgraded peer version {peer_version} to {version}")
+            print(f"\n[{peer}]: downgraded dependency version {peer_version} --> {version} (for {dependency}@{dependency_version}, previous peerDependency: {dependency}@{peer_requirements})")
             temp_peerDependencies = get_peerDependencies(peer, version, mute=True)
             package = _update_dependency_version(package, peer, version, peerDependencies=temp_peerDependencies, include_stale_dependencies=include_stale_dependencies)
+            print(f"-- satisfied {peer}@{version} peerDependency: {dependency}@{package[peer]["peerDependencies"][dependency]}")
 
     return package
 
@@ -381,8 +438,8 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
 
 def main():
     include_stale_dependencies = []
-    #include_stale_dependencies = ["react-table", "@testing-library/react-hooks"]
     package = {}
+    print("adding dependencies to package...")
     for dependency in get_dependencies_list():
         package = add_recursive_dependency_to_package(package, dependency, required_by="<root>", include_stale_dependencies=include_stale_dependencies)
     while package_problems := check_package_problems(package):
