@@ -92,11 +92,11 @@ def overwrite_package():
             if "dependencies" not in key.lower(): continue
             for dependency, version in package_versions.items():
                 if dependency in package_json[key]:
-                    package_json[key][dependency] = f"^{version}"
+                    package_json[key][dependency] = version
                     updated_dependencies.append(dependency)
         for dependency, version in package_versions.items():
             if dependency in updated_dependencies: continue
-            package_json["dependencies"][dependency] = f"^{version}"
+            package_json["dependencies"][dependency] = version
         with open("package.json", "w") as file:
             json.dump(package_json, file, indent=4)
         print("package.json has been updated with versions from package-versions.json.")
@@ -154,9 +154,10 @@ def get_versions(dependency):
 
 
 def get_latest_version(dependency):
+    print("latest version", end=" ", flush=True)
     dist_tags_output = npm_cache("view", dependency, "dist-tags")
     latest_version = dist_tags_output["latest"]
-    print(f"latest version ({latest_version})", end=" ", flush=True)
+    print(f"({latest_version})", end=" ", flush=True)
     return latest_version
 
 
@@ -164,7 +165,7 @@ def get_latest_version(dependency):
 
 
 def get_peerDependencies(dependency, version, mute=False):
-    if mute == False: print(f"peerDependencies", end=" ", flush=True)
+    if mute == False: print("peerDependencies", end=" ", flush=True)
     peerDependencies_output = npm_cache("info", f"{dependency}@{version}", "peerDependencies")
     peerDependenciesMeta_output = npm_cache("info", f"{dependency}@{version}", "peerDependenciesMeta")
     peerDependencies = {}
