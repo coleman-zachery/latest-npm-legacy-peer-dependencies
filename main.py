@@ -394,7 +394,7 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
             package = _update_dependency_version(package, dependency, version, peerDependencies=None, include_stale_dependencies=include_stale_dependencies)
             if len(peers) > 0:
                 satisfied_peers = peers
-        print(f"\n[{dependency}]: downgraded dependency version {dependency_version} --> {version}")
+        print(f"\ndowngraded {dependency}: {dependency_version} --> {version}")
         for peer in satisfied_peers:
             print(f"-- satisfied {peer}@{package[peer]["version"]} peerDependency: {dependency}@{problems["greater_than"][peer]}")
 
@@ -426,10 +426,10 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
         peer_requirements = package[peer]["peerDependencies"][dependency]
         version = _find_compatible_version(peer, dependency, dependency_version, package)
         if version:
-            print(f"\n[{peer}]: downgraded dependency version {peer_version} --> {version} (for {dependency}@{dependency_version}, previous peerDependency: {dependency}@{peer_requirements})")
+            print(f"\ndowngraded {peer}: {peer_version} --> {version}")
             temp_peerDependencies = get_peerDependencies(peer, version, mute=True)
             package = _update_dependency_version(package, peer, version, peerDependencies=temp_peerDependencies, include_stale_dependencies=include_stale_dependencies)
-            print(f"-- satisfied {peer}@{version} peerDependency: {dependency}@{package[peer]["peerDependencies"][dependency]}")
+            print(f"-- satisfies {peer}@{version} new peerDependency for {dependency}@{dependency_version}: {dependency}@{package[peer]["peerDependencies"][dependency]} (previous peerDependency: {dependency}@{peer_requirements})")
 
     return package
 
@@ -449,7 +449,7 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
 def main():
     include_stale_dependencies = []
     package = {}
-    print("adding dependencies to package...")
+    print("finding package dependency versions and peerDependencies...")
     for dependency in get_dependencies_list():
         package = add_recursive_dependency_to_package(package, dependency, required_by="<root>", include_stale_dependencies=include_stale_dependencies)
     while package_problems := check_package_problems(package):
