@@ -44,12 +44,42 @@ def write_package_peerDependencies(package):
                     package_peerDependencies[dependency][key] = value
         json.dump(package_peerDependencies, file, indent=4)
 
+def print_added_peerDependencies(package):
+    added_peerDependencies = []
+    dependencies = get_dependencies_list()
+    for dependency in package:
+        if dependency in dependencies: continue
+        added_peerDependencies.append(dependency)
+    print(f"added peerDependencies: {added_peerDependencies}")
+
 def print_stale_dependencies(package):
     stale_dependencies = []
     for dependency, dependency_info in package.items():
         if dependency_info["stale"]:
             stale_dependencies.append(dependency)
     print(f"stale dependencies found: {stale_dependencies}")
+
+def overwrite_package():
+    overwrite = input('Enter "yes" to overwrite package.json: ')
+    overwrite = overwrite.strip().lower() == "yes"
+    if overwrite:
+        with open("package-versions.json", "r") as file:
+            package_versions = json.load(file)
+        with open("package.json", "r") as file:
+            package_json = json.load(file)
+        updated_dependencies = []
+        for key in package_json:
+            if "dependencies" not in key.lower(): continue
+            for dependency, version in package_versions.items():
+                if dependency in package_json[key]:
+                    package_json[key][dependency] = version
+                    updated_dependencies.append(dependency)
+        for dependency, version in package_versions.items():
+            if dependency in updated_dependencies: continue
+            package_json["dependencies"][dependency] = version
+        with open("package.json", "w") as file:
+            json.dump(package_json, file, indent=4)
+        print("package.json has been updated with versions from package-versions.json.")
 
 
 
@@ -194,6 +224,7 @@ def check_version_compatibility(semver_version, semver_requirements):
 
 
 
+
 # ------------------------------
 # un-used
 # ------------------------------
@@ -213,6 +244,7 @@ def semver_range_to_string(range_):
     if max_parts == "inf": return min_str
     max_str = f"<{parts_to_string(max_parts)}"
     return f"{min_str} {max_str}"
+
 
 
 
@@ -349,6 +381,7 @@ def resolve_package_problems(package, package_problems, include_stale_dependenci
 
 def main():
     include_stale_dependencies = []
+    #include_stale_dependencies = ["react-table", "@testing-library/react-hooks"]
     package = {}
     for dependency in get_dependencies_list():
         package = add_recursive_dependency_to_package(package, dependency, required_by="<root>", include_stale_dependencies=include_stale_dependencies)
@@ -356,7 +389,9 @@ def main():
         package = resolve_package_problems(package, package_problems, include_stale_dependencies=include_stale_dependencies)
     write_package_peerDependencies(package)
     write_package_versions(package)
+    print_added_peerDependencies(package)
     print_stale_dependencies(package)
+    overwrite_package()
 
 if __name__ == "__main__":
     main()
