@@ -8,12 +8,12 @@ Update your package.json to use the latest non-breaking dependencies and their r
 - recursively downgrades dependencies to satisfy peerDependencies
 - can update your package.json in place
 
-<img width="968" height="289" alt="image" src="https://github.com/user-attachments/assets/96ab99c7-b3d9-40cc-b3e8-b67d118d8bcf" />
+<img width="984" height="292" alt="image" src="https://github.com/user-attachments/assets/6c2a029e-7c50-4bd4-b5d1-578e23034182" />
 
 ---
 
-<img width="1081" height="263" alt="image" src="https://github.com/user-attachments/assets/bad09ea2-2f8c-43de-8513-54cfe344841b" />
+<img width="1103" height="253" alt="image" src="https://github.com/user-attachments/assets/c3695f0d-b12a-4772-803c-4639eeb3e83e" />
 
 ---
 
-<img width="1089" height="212" alt="image" src="https://github.com/user-attachments/assets/3eba9312-d9f4-4c16-9e97-73a20122fb94" />
+<img width="1101" height="266" alt="image" src="https://github.com/user-attachments/assets/b0dbf779-1bea-49f8-8198-5e6cde1d89c2" />
