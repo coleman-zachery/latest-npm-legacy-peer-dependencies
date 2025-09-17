@@ -12,7 +12,7 @@ Update your package.json to use the latest non-breaking dependencies and their r
 
 ---
 
-<img width="1103" height="253" alt="image" src="https://github.com/user-attachments/assets/c3695f0d-b12a-4772-803c-4639eeb3e83e" />
+<img width="1093" height="274" alt="image" src="https://github.com/user-attachments/assets/863627c4-86eb-4276-9127-2ef5b85ba60d" />
 
 ---
 
