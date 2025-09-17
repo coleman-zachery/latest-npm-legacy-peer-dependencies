@@ -12,8 +12,8 @@ Update your package.json to use the latest non-breaking dependencies and their r
 
 ---
 
-<img width="1093" height="274" alt="image" src="https://github.com/user-attachments/assets/863627c4-86eb-4276-9127-2ef5b85ba60d" />
+<img width="849" height="226" alt="image" src="https://github.com/user-attachments/assets/452f84b7-ba6c-4c3b-a832-b9258db4d80e" />
 
 ---
 
-<img width="1101" height="266" alt="image" src="https://github.com/user-attachments/assets/b0dbf779-1bea-49f8-8198-5e6cde1d89c2" />
+<img width="1101" height="208" alt="image" src="https://github.com/user-attachments/assets/d1f25cc5-44da-471c-af17-aa4b5a59d0ee" />
