@@ -1,1 +1,1 @@
-- better logging to show why selected dependencies were downgraded
+- Add better logging to show why selected dependencies were downgraded.
