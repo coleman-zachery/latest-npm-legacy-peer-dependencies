@@ -1,4 +1,4 @@
-# latest-npm-legacy-peer-dependencies
+# npm-latest-peerDependencies
 Update your package.json to use the latest non-breaking dependencies and their required peers.
 
 - finds all your package dependencies
