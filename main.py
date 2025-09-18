@@ -79,9 +79,10 @@ def print_stale_dependencies(package):
 
 
 
-def overwrite_package():
-    overwrite = input('\nEnter "yes" to overwrite package.json: ')
-    overwrite = overwrite.strip().lower() == "yes"
+def overwrite_package(overwrite):
+    if not overwrite:
+        overwrite = input('\nEnter "yes" to overwrite package.json: ')
+        overwrite = overwrite.strip().lower() == "yes"
     if overwrite:
         with open("package-versions.json", "r") as file:
             package_versions = json.load(file)
